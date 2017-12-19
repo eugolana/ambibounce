@@ -9,15 +9,25 @@ masterGain.value = 0.05;
 masterGain.connect(audioContext.destination);
 
 var bgrnd = new Path.Rectangle(new Rectangle(new Point(0,0), new Point(canvas.width, canvas.height)));
-bgrnd.fillColor = 'blue';
+bgrnd.fillColor = new Color(192,192,192, 1);
 
 var Ball = function(pos, size, weight){
 	this.pos = pos;
-	this.size = size
+	this.size = size;
 	this.weight = weight
 
 	this.traj = new Point(0,0);
-	this.ball = new Path.Circle(this.pos, size);
+	this.ball = new Group()
+	this.inner = Path.Circle(this.pos, size/3);
+	this.inner.opacity = 1;
+	this.mid = Path.Circle(this.pos, size * 0.66)
+	this.mid.opacity = 0.3;
+	this.outer = Path.Circle(this.pos, size);
+	this.outer.opacity = 0.3;
+	this.shell = Path.Circle(this.pos, size * 1.33);
+	this.shell.opacity = 0.2;
+
+	this.ball.addChildren([this.inner, this.mid, this.outer, this.shell]);
 	this.ball.fillColor = 'black';
 	this.bounced = 0;
 }
@@ -26,12 +36,12 @@ Ball.prototype.run = function(gravity, lines) {
 	if (this.bounced == 0) {
 		for (var i = 0; i < lines.length; i++) {
 			var line = lines[i]
-			if (this.ball.intersects(line.line)){
+			if (this.outer.intersects(line.innerLine)){
 				a =  this.traj.angle - line.angle
 				b = 180 - a;
 				c = a - b;
 				this.traj = this.traj.rotate(-180 - c, new Point(0,0))
-				this.bounced = 6;
+				this.bounced = 2;
 				line.sound(this);
 			} else {
 				//
@@ -52,19 +62,43 @@ var Line = function(posA, posB, soundOut) {
 	this.posB = posB;
 	this.soundOut = soundOut;
 	this.angle = (posB - posA).angle;
-	this.line = new Path(posA, posB);
-	this.pitch = 440 / (this.line.length/400);
-	this.line.strokeColor = 'black';
-	this.line.strokeWidth = 3;
+	this.line = new Group()
+
+	this.innerLine = new Path(this.posA, this.posB);
+	this.innerLine.strokeWidth = 1;
+	this.innerLine.opacity = 0.8;
+	this.innerLine.strokeCap = 'round';
+	this.innerLine.strokeColor = new Color(0,0,0,0.7);
+
+	this.midLine = new Path(this.posA, this.posB)
+	this.midLine.strokeWidth = 5;
+	this.midLine.strokeCap = 'round';
+	this.midLine.strokeColor = new Color(0,0,0,0.2);
+
+	this.outerLine = new Path(this.posA, this.posB);
+	this.outerLine.strokeColor = new Color(0,0,0,0.2);
+	this.outerLine.strokeCap = 'round';
+	this.outerLine.strokeWidth = 10;
+	// this.outerLine.opacity = 0.3;
+
+	this.line.addChildren([this.innerLine, this.midLine, this.outerLine])
+	this.pitch = 440 / (this.outerLine.length/400);
 	this.oscList = [];
 }
 
 Line.prototype.updateLine = function(posB) {
 	this.posB = posB;
-	this.line.removeSegment(1);
-	this.line.add(this.posB)
+	this.innerLine.removeSegment(1);
+	this.innerLine.add(this.posB)
+
+	this.outerLine.removeSegment(1);
+	this.outerLine.add(this.posB)
+
+	this.midLine.removeSegment(1);
+	this.midLine.add(this.posB)
+
 	this.angle = (this.posB - this.posA).angle;
-	this.pitch = 440 / (this.line.length/400);
+	this.pitch = 440 / (this.innerLine.length/400);
 }
 
 Line.prototype.sound = function(ball) {
@@ -96,12 +130,6 @@ Line.prototype.purge = function(now){
 		}
 	}
 }
-
-
-// var b = new Ball(new Point(100, 0), 10, 10);
-
-// var l = new Line(new Point(50, 140), new Point(150, 240), masterGain);
-// var l2 = new Line(new Point(750, 240), new Point(850, 140), masterGain);
 
 var tempPoint;
 var tempLine;
