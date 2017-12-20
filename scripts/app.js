@@ -169,6 +169,7 @@ Line.prototype.purge = function(now){
 Line.prototype.remove = function(){
 	this.line.remove();
 	this.line = false;
+	this.innerLine = false;
 }
 
 Line.prototype.deleteLine = function(){
@@ -193,7 +194,7 @@ function onFrame(){
 	var now = audioContext.currentTime;
 	for (var i = 0; i < lines.length;) {
 		lines[i].purge(now);
-		if (!lines[i].line) {
+		if (!lines[i].line && lines[i].oscList.length == 0) {
 			lines.splice(i, 1);
 		} else {
 			lines[i].run();
@@ -201,7 +202,7 @@ function onFrame(){
 		}
 	}
 	for (var i = 0; i < balls.length; i++) {
-		balls[i].run(0.05, lines);
+		balls[i].run(0.075, lines);
 	}
 }
 
