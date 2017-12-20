@@ -84,12 +84,12 @@ var Line = function(posA, posB, soundOut) {
 	this.midLine = new Path(this.posA, this.posB)
 	this.midLine.strokeWidth = 7;
 	this.midLine.strokeCap = 'round';
-	this.midLine.strokeColor = new Color(0,0,0,0.4);
+	this.midLine.strokeColor = new Color(0,0,0,0.3);
 
 	this.outerLine = new Path(this.posA, this.posB);
 	this.outerLine.strokeColor = new Color(0,0,0,0.2);
 	this.outerLine.strokeCap = 'round';
-	this.outerLine.strokeWidth = 10;
+	this.outerLine.strokeWidth = 14;
 	// this.outerLine.opacity = 0.3;
 
 	this.soundLine = new Path(this.posA, this.posB);
@@ -98,18 +98,13 @@ var Line = function(posA, posB, soundOut) {
 	this.soundLine.strokeColor = new Color(255,255,255, 0.0);
 
 	this.line.addChildren([this.innerLine, this.midLine, this.outerLine, this.soundLine])
-	this.pitch = 440 / (this.outerLine.length/400);
+	this.pitch = 160000 / this.outerLine.length;
 	this.oscList = [];
 
-	this.outerLine.onMouseEnter = function(event){
-		this.strokeColor = new Color(128, 0, 0, 0.2);
-	}
-	this.outerLine.onMouseLeave = function(event){
-		this.strokeColor = new Color(0, 0, 0, 0.2);
-	}
+	this.outerLine.onMouseEnter = this.focusFunc();
+	this.outerLine.onMouseLeave = this.blurFunc();
 	this.outerLine.onDoubleClick = this.deleteLine();
 	this.soundLine.onDoubleClick = this.deleteLine();
-
 }
 
 Line.prototype.run = function(){
@@ -119,7 +114,26 @@ Line.prototype.run = function(){
 }
 
 Line.prototype.updateLine = function(posB) {
-	this.posB = posB;
+	
+	if (snapToScale) {
+		var tempLine = (posB - this.posA);
+		length = tempLine.length;
+		var i = 0;
+		while (true) {
+			// console.log('checking against')
+			// console.log(chromatic_scale[i])
+			if (length < selectedScale[i]) {
+				this.posB = this.posA + tempLine.normalize(selectedScale[i-1]);
+				break;
+			}
+			i++;
+		}
+	} else {
+		this.posB = posB;
+	}
+
+
+
 	this.innerLine.removeSegment(1);
 	this.innerLine.add(this.posB)
 
@@ -133,14 +147,15 @@ Line.prototype.updateLine = function(posB) {
 	this.soundLine.add(this.posB)
 
 	this.angle = (this.posB - this.posA).angle;
-	this.pitch = 440 / (this.innerLine.length/400);
+	this.pitch = 160000 /this.innerLine.length;
+	freqText.content = "frequency: " + parseFloat(this.pitch).toFixed(2).toString()
 }
 
 Line.prototype.sound = function(ball) {
 	osc = audioContext.createOscillator();
 	osc.frequency.value = this.pitch;
 	var volume = Math.min(ball.traj.length / 10, 1);
-	ge = createEnv(0.1, 0.6, 0.5, 1.0, volume, audioContext);
+	ge = createEnv(0.05, 0.6, 0.5, 1.0, volume, audioContext);
 	gain = ge[0]
 	end = ge[1]
 	gain.connect(this.gain)
@@ -179,8 +194,26 @@ Line.prototype.deleteLine = function(){
 	}
 }
 
+Line.prototype.focusFunc = function() {
+	var line = this;
+	return function(event) {
+		line.outerLine.strokeColor = new Color(128, 0, 0, 0.2);
+		freqText.content = "frequency: " + parseFloat(line.pitch).toFixed(2).toString()
+	}
+}
+
+Line.prototype.blurFunc = function() {
+	var line = this;
+	return function(event) {
+		line.outerLine.strokeColor = new Color(0, 0, 0, 0.2);
+	}
+}
+
 var tempPoint;
 var tempLine;
+
+var snapToScale = false;
+chosenScale = chromatic_scale;
 
 balls = [];
 lines = [];
@@ -188,6 +221,10 @@ lines = [];
 var helloText =  new PointText(new Point(20, 15))
 
 helloText.content = "Double click to spawn a ball. Click and drag to draw a line."
+
+var freqText = new PointText(new Point(20, canvas.height - 20))
+
+freqText.content = 'frequency: '
 
 
 function onFrame(){
@@ -214,6 +251,9 @@ function onMouseDown(event) {
 bgrnd.onMouseDrag = function(event) {
 	if (!tempLine) {
 		if ((tempPoint - event.point).length >= 10) {
+			if (snapToScale) {
+				// Math.pow(2, n/12) ;
+			}
 			tempLine = new Line(tempPoint, event.point, masterGain);
 			lines.push(tempLine)
 		}
@@ -236,6 +276,7 @@ function createEnv(a,d,s,r,volume, context) {
 	var gain = context.createGain();
 	gain.gain.value = 0.0;
 	var now = context.currentTime;
+	gain.gain.setValueAtTime(gain.gain.value, now);
 	a = now + a;
 	d = a + d;
 	r = d + r;
@@ -245,3 +286,102 @@ function createEnv(a,d,s,r,volume, context) {
 	return [gain, r];
 }
 
+
+
+var chromatic_scale = [];
+for (var i = 0; i < 100; i++) {
+	chromatic_scale.push(1454.54545454545/Math.pow(2, (100 - i)/12))
+}
+
+var pentatonic_scale = [];
+pentapattern = [3,2,2,3,2]
+
+pentatonic_index = []
+n = 0;
+while (n < chromatic_scale.length){
+	pentatonic_scale.push(chromatic_scale[n]);
+	n += pentapattern[pentatonic_scale.length%pentapattern.length];
+}
+
+var major_scale = []
+
+majorPattern = [2,2,1,2,2,2,1]
+
+n = 0;
+while (n < chromatic_scale.length){
+	major_scale.push(chromatic_scale[n]);
+	n += majorPattern[major_scale.length%majorPattern.length];
+}
+
+
+var getButton = function(pos, size, text) {
+	var g = new Group()
+	var rect = new Path.Rectangle(new Rectangle(pos, size));
+	var t = new PointText(pos + new Point(5, 10))
+	t.content = text
+	// console.log
+	g.addChildren([rect, t])
+	g.opacity = 0.5;
+	return g
+}
+
+snapToggle = getButton(new Point(25,30), new Size(125, 15), 'Snap to scale - off');
+
+
+var scaleChooser = new Group()
+
+var chromButton = getButton(new Point(25, 50), new Size(125, 15), 'Chromatic')
+
+
+var majorButton = getButton(new Point(25, 70), new Size(125, 15), 'Major')
+var pentatonicButton = getButton(new Point(25, 90), new Size(125, 15), 'Pentatonic')
+
+
+scaleChooser.addChildren([chromButton, majorButton, pentatonicButton])
+
+scaleChooser.sendToBack();
+
+
+snapToggle.onClick = function(){
+	snapToScale = !snapToScale
+	if (snapToScale) {
+		this.children[1].content = "Snap to scale - on"
+		this.opacity = 0.8;
+		scaleChooser.bringToFront();
+
+	} else {
+		this.children[1].content = "Snap to scale - off"
+		this.opacity = 0.5;
+		scaleChooser.sendToBack();
+	}
+}
+
+chromButton.onClick = function() {
+	if (this.opacity = 0.5) {
+		for (var i = 0; i < scaleChooser.children.length; i++) {
+			scaleChooser.children[i].opacity = 0.5;
+		}
+		this.opacity = 0.8;
+		selectedScale = chromatic_scale;
+	} 
+}
+
+majorButton.onClick = function() {
+	if (this.opacity = 0.5) {
+		for (var i = 0; i < scaleChooser.children.length; i++) {
+			scaleChooser.children[i].opacity = 0.5;
+		}
+		this.opacity = 0.8;
+		selectedScale = major_scale;
+	} 
+}
+
+pentatonicButton.onClick = function() {
+	if (this.opacity = 0.5) {
+		for (var i = 0; i < scaleChooser.children.length; i++) {
+			scaleChooser.children[i].opacity = 0.5;
+		}
+		this.opacity = 0.8;
+		selectedScale = pentatonic_scale;
+	} 
+}
