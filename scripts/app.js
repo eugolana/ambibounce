@@ -1,3 +1,30 @@
+// construct scale etc..
+var notes = ["A#", "B", "C","C#", "D", "D#", "E", "F", "F#", "G", "G#", "A"].reverse()
+
+var chromatic_scale = [];
+for (var i = 0; i < 120; i++) {
+	chromatic_scale.push([1454.54545454545/Math.pow(2, (120 - i)/12), notes[i%12]])
+}
+
+var pentatonic_scale = [];
+pentapattern = [3,2,2,3,2].reverse()
+n = 0;
+while (n < chromatic_scale.length){
+	pentatonic_scale.push(chromatic_scale[n]);
+	n += pentapattern[(pentatonic_scale.length-1) % pentapattern.length];
+}
+
+
+var major_scale = []
+majorPattern = [2,2,1,2,2,2,1].reverse()
+n = 0;
+while (n < chromatic_scale.length){
+	major_scale.push(chromatic_scale[n]);
+	n += majorPattern[(major_scale.length - 1) % majorPattern.length];
+}
+
+
+// canvas/audio setup
 var canvas = document.getElementById('myCanvas')
 // canvas.width = window.width;
 
@@ -15,6 +42,8 @@ pre_bgrnd.fillColor = 'black'
 var bgrnd = new Path.Rectangle(new Rectangle(new Point(0,0), new Point(canvas.width, canvas.height)));
 bgrnd.fillColor = new Color(0.0,0.0,0.0, 0.1);
 
+
+// define objects
 var Ball = function(pos, size, weight){
 	this.pos = pos;
 	this.size = size;
@@ -285,6 +314,10 @@ Splash.prototype.run = function(){
 
 
 
+// MAIN (should be mvoed into 'app' object)
+
+var gravity = 0.075;
+
 
 var tempPoint;
 var tempLine;
@@ -294,12 +327,10 @@ var selectedScale = chromatic_scale;
 
 var colorSplash = false;
 
+
+
 balls = [];
 lines = [];
-
-
-
-
 
 
 function onFrame(){
@@ -314,7 +345,7 @@ function onFrame(){
 		}
 	}
 	for (var i = 0; i < balls.length; i++) {
-		balls[i].run(0.075, lines);
+		balls[i].run(gravity, lines);
 	}
 }
 
@@ -364,32 +395,6 @@ function createEnv(a,d,s,r,volume, context) {
 	return [gain, r];
 }
 
-
-var notes = ["A#", "B", "C","C#", "D", "D#", "E", "F", "F#", "G", "G#", "A"].reverse()
-var chromatic_scale = [];
-for (var i = 0; i < 120; i++) {
-	chromatic_scale.push([1454.54545454545/Math.pow(2, (120 - i)/12), notes[i%12]])
-}
-
-var pentatonic_scale = [];
-pentapattern = [3,2,2,3,2].reverse()
-
-n = 0;
-while (n < chromatic_scale.length){
-	pentatonic_scale.push(chromatic_scale[n]);
-	n += pentapattern[(pentatonic_scale.length-1) % pentapattern.length];
-}
-
-
-var major_scale = []
-
-majorPattern = [2,2,1,2,2,2,1].reverse()
-
-n = 0;
-while (n < chromatic_scale.length){
-	major_scale.push(chromatic_scale[n]);
-	n += majorPattern[(major_scale.length - 1) % majorPattern.length];
-}
 
 
 var getButton = function(pos, size, text, color) {
@@ -442,7 +447,7 @@ chromButton.onClick = function() {
 		for (var i = 0; i < scaleChooser.children.length; i++) {
 			scaleChooser.children[i].opacity = 0.5;
 		}
-		this.opacity = 0.8;
+		this.opacity = 1.0;
 		selectedScale = chromatic_scale;
 	} 
 }
@@ -452,7 +457,7 @@ majorButton.onClick = function() {
 		for (var i = 0; i < scaleChooser.children.length; i++) {
 			scaleChooser.children[i].opacity = 0.5;
 		}
-		this.opacity = 0.8;
+		this.opacity = 1.0;
 		selectedScale = major_scale;
 	} 
 }
@@ -462,7 +467,7 @@ pentatonicButton.onClick = function() {
 		for (var i = 0; i < scaleChooser.children.length; i++) {
 			scaleChooser.children[i].opacity = 0.5;
 		}
-		this.opacity = 0.8;
+		this.opacity = 1.0;
 		selectedScale = pentatonic_scale;
 	} 
 }
@@ -475,7 +480,7 @@ pentatonicButton.onClick = function() {
 
 // helloText.fillColor = 'white';
 
-var freqText = new PointText(new Point(canvas.width - 140, 60))
+var freqText = new PointText(new Point(canvas.width - 140, 100))
 
 freqText.content = " ";
 freqText.fillColor = 'white';
@@ -495,6 +500,24 @@ splashToggle.onClick = function() {
 		this.children[1].content = 'Note splash - on'
 	}
 }
+
+var gravityToggle = getButton(new Point(canvas.width - 145,60), new Size(125, 15), 'Gravity - on', 'white');
+
+gravityToggle.opacity = 0.8;
+
+gravityToggle.onClick = function() {
+	if (gravity > 0) {
+		tempGravity = gravity;
+		gravity = 0.0;
+		this.children[1].content = 'Gravity - off';
+		this.opacity = 0.3;
+	} else {
+		gravity = tempGravity;
+		this.children[1].content = 'Gravity - on';
+		this.opacity = 0.8;
+	}
+}
+
 
 var help = getButton(new Point(20, canvas.height - 30), new Size(20, 15), '?', 'white');
 
