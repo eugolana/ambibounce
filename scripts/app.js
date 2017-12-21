@@ -169,6 +169,7 @@ Line.prototype.updateLine = function(posB) {
 	this.soundLine.add(this.posB)
 
 	this.angle = (this.posB - this.posA).angle;
+
 	this.pitch = 160000 /this.innerLine.length;
 	var text = "frequency: " + parseFloat(this.pitch).toFixed(2).toString()
 	if (this.note) {
@@ -247,6 +248,7 @@ Line.prototype.blurFunc = function() {
 	return function(event) {
 		if (!line.moving) {
 			line.outerLine.strokeColor = new Color(0, 0, 0, 0.2);
+			freqText.content = " ";
 		}
 	}
 }
@@ -295,17 +297,6 @@ var colorSplash = false;
 balls = [];
 lines = [];
 
-var helloText =  new PointText(new Point(20, 15))
-
-
-helloText.content = "Double click to spawn a ball. Click and drag to draw a line."
-
-helloText.fillColor = 'white';
-
-var freqText = new PointText(new Point(20, canvas.height - 20))
-
-freqText.content = 'frequency: '
-freqText.fillColor = 'white';
 
 
 
@@ -476,7 +467,22 @@ pentatonicButton.onClick = function() {
 	} 
 }
 
-var splashToggle = getButton(new Point(canvas.width - 135,30), new Size(125, 15), 'Note Splash - off', 'white');
+
+// var helloText =  new PointText(new Point(20, canvas.height - 5))
+
+
+// helloText.content = "Double click to spawn a ball. Click and drag to draw a line."
+
+// helloText.fillColor = 'white';
+
+var freqText = new PointText(new Point(canvas.width - 140, 60))
+
+freqText.content = " ";
+freqText.fillColor = 'white';
+freqText.opacity = 0.8;
+
+var splashToggle = getButton(new Point(canvas.width - 145,30), new Size(125, 15), 'Note Splash - off', 'white');
+
 
 splashToggle.onClick = function() {
 	if (colorSplash){
@@ -487,5 +493,27 @@ splashToggle.onClick = function() {
 		colorSplash = true;
 		this.opacity = 0.8;
 		this.children[1].content = 'Note splash - on'
+	}
+}
+
+var help = getButton(new Point(20, canvas.height - 30), new Size(20, 15), '?', 'white');
+
+help.onMouseEnter = function(){
+	this.opacity = 0.8;
+}
+
+help.showing = false;
+
+help.onMouseLeave = function(){
+	this.opacity = 0.5;
+}
+
+help.onClick = function(){
+	if (!this.showing) {
+		this.children[1].content = "Double click to spawn a ball. Click and drag to draw a line."
+		this.showing = true;
+	} else {
+		this.showing = false;
+		this.children[1].content = "?"
 	}
 }
