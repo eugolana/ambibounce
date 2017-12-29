@@ -2,21 +2,21 @@ var App = function(canvasId) {
 	this.canvas = document.getElementById(canvasId);
 	this.width = this.canvas.width;
 	this.height = this.canvas.height;
-	this.audioContext = new (window.AudioContext || window.webkitAudioContext);
+	this.audioContext = (new window.AudioContext() || new window.webkitAudioContext());
 	this.masterGain = this.audioContext.createGain();
 	this.masterGain.gain.value = 0.3;
 	this.masterGain.connect(this.audioContext.destination);
 	this.initialiseScales();
 	this.gravity = 0.075;
-	this.tempPoint;
-	this.tempLine;
+	this.tempPoint = undefined;
+	this.tempLine = undefined;
 	this.snapToScale = false;
-	this.selectedScale = this.scales['chromatic'];
-	this.colorSplash = true;
+	this.selectedScale = this.scales.chromatic;
+	this.colorSplash = false;
 	this.balls = [];
 	this.lines = [];
 	this.setupUI();
-}
+};
 
 
 App.prototype.setupUI = function(){
@@ -45,15 +45,15 @@ App.prototype.setupUI = function(){
 	this.help.onMouseEnter = this.textFocus;
 	this.help.onMouseLeave = this.textBlur;
 	this.help.onClick = this.toggleHelp();
-}
+};
 
 App.prototype.textFocus = function(){
 	this.opacity = 0.8;
-}
+};
 
 App.prototype.textBlur = function(){
 	this.opacity = 0.5;
-}
+};
 
 App.prototype.toggleHelp = function(){
 	var _this = this;
@@ -65,8 +65,8 @@ App.prototype.toggleHelp = function(){
 			_this.showingHelp = false;
 			this.children[1].content = "?";
 		}
-	}
-}
+	};
+};
 
 App.prototype.toggleGravity = function() {
 	var _this = this;
@@ -81,13 +81,12 @@ App.prototype.toggleGravity = function() {
 			this.children[1].content = 'Gravity - on';
 			this.opacity = 0.8;
 		}
-	}
-
-}
+	};
+};
 
 App.prototype.toggleSplash = function() {
-		var _this = this;
-		return function() {
+	var _this = this;
+	return function() {
 		if (_this.colorSplash){
 			_this.colorSplash = false;
 			this.opacity = 0.5;
@@ -97,15 +96,15 @@ App.prototype.toggleSplash = function() {
 			this.opacity = 0.8;
 			this.children[1].content = 'Note splash - on';
 		}
-	}
-}
+	};
+};
 
 App.prototype.initialiseLine = function(){
 	var _this = this;
 	return function(event) {
 		_this.tempPoint = event.point;
-	}
-}	
+	};
+};	
 
 App.prototype.updateLine = function() {
 	var _this = this;
@@ -120,8 +119,8 @@ App.prototype.updateLine = function() {
 		else {
 			_this.tempLine.updateLine(event.point, _this.snapToScale);
 		}
-	}
-}
+	};
+};
 
 App.prototype.settleLine = function() {
 	var _this = this;
@@ -131,16 +130,15 @@ App.prototype.settleLine = function() {
 		}
 		_this.tempLine = undefined;
 		_this.tempPoint = undefined;
-	}
-}
+	};
+};
 
 App.prototype.spawnBall = function(){
 	var _this = this;
 	return function(event) {
 		_this.balls.push(new Ball(event.point, 10, 10, app));
-	}
-}
-
+	};
+};
 
 App.prototype.toggleSnap = function() {
 	_this = this;
@@ -151,28 +149,25 @@ App.prototype.toggleSnap = function() {
 			this.opacity = 0.8;
 			_this.scaleChooser.bringToFront();
 			_this.scaleChooser.opacity = 0.5;
-
 		} else {
 			this.children[1].content = "Snap to scale - off";
 			this.opacity = 0.5;
 			_this.scaleChooser.sendToBack();
 			_this.scaleChooser.opacity = 0.0;
 		}
-	}
-}
-
-
+	};
+};
 
 App.prototype.constructButton = function(pos, size, text, color) {
 	var g = new Group();
 	var rect = new Path.Rectangle(new Rectangle(pos, size));
-	var t = new PointText(pos + new Point(5, 10))
+	var t = new PointText(pos + new Point(5, 10));
 	t.content = text;
 	t.fillColor = color;
 	g.addChildren([rect, t]);
 	g.opacity = 0.5;
 	return g;
-}
+};
 
 App.prototype.initScaleChooser = function() {
 	this.scaleChooser = new Group();
@@ -188,20 +183,20 @@ App.prototype.initScaleChooser = function() {
 		this.scaleChooser.addChild(button);
 	}
 	this.scaleChooser.sendToBack();
-}
+};
 
 App.prototype.selectScaleClick = function(key){
 	_this = this;
 	return function(event){
-		if (this.opacity = 0.5) {
+		if (this.opacity == 0.5) {
 			for (var i = 0; i < _this.scaleChooser.children.length; i++) {
 				_this.scaleChooser.children[i].opacity = 0.5;
 			}
 			this.opacity = 1.0;
 			_this.selectedScale = _this.scales[key];
 		}
-	}
-}
+	};
+};
 
 App.prototype.run = function(){
 	var now = this.audioContext.currentTime;
@@ -215,11 +210,11 @@ App.prototype.run = function(){
 			i++;
 		}
 	}
-	for (var i = 0; i < this.balls.length; i++) {
-		var ball = this.balls[i];
+	for (var ii = 0; ii < this.balls.length; ii++) {
+		var ball = this.balls[ii];
 		ball.run();
 	}
-}
+};
 
 App.prototype.initialiseScales = function() {
 	var notes = ["B", "C","C#", "D", "D#", "E", "F", "F#", "G", "G#", "A"].reverse();
@@ -236,7 +231,7 @@ App.prototype.initialiseScales = function() {
 		n += pentapattern[(pentatonic_scale.length-1) % pentapattern.length];
 	}
 
-	var major_scale = []
+	var major_scale = [];
 	majorPattern = [2,2,1,2,2,2,1].reverse();
 	n = 0;
 	while (n < chromatic_scale.length){
@@ -247,8 +242,8 @@ App.prototype.initialiseScales = function() {
 		'chromatic': chromatic_scale,
 		'major': major_scale,
 		'pentatonic': pentatonic_scale
-	}
-}
+	};
+};
 
 
 var Ball = function(pos, size, weight, app){
@@ -272,17 +267,17 @@ var Ball = function(pos, size, weight, app){
 	this.ball.fillColor = 'white';
 	this.soundBall.fillColor = 'black';
 	this.bounced = 0;
-}
+};
 
 Ball.prototype.run = function() {
 	if (this.bounced == 0) {
 		for (var i = 0; i < this.app.lines.length; i++) {
 			var line = this.app.lines[i];
 			if (this.outer.intersects(line.innerLine)){
-				a =  this.traj.angle - line.angle
+				a =  this.traj.angle - line.angle;
 				b = 180 - a;
 				c = a - b;
-				this.traj = this.traj.rotate(-180 - c, new Point(0,0))
+				this.traj = this.traj.rotate(-180 - c, new Point(0,0));
 				this.bounced = 1;
 				line.sound(this);
 				this.soundBall.opacity = Math.min(0.8, this.soundBall.opacity + 0.3);
@@ -296,7 +291,7 @@ Ball.prototype.run = function() {
 	this.pos += this.traj;
 	this.ball.translate(this.traj);
 	this.soundBall.opacity = this.soundBall.opacity * 0.99;
-}
+};
 
 
 var Line = function(posA, posB, app) {
@@ -315,7 +310,7 @@ var Line = function(posA, posB, app) {
 	this.innerLine.strokeCap = 'round';
 	this.innerLine.strokeColor = new Color(0.0,0.0,0.0,1.0);
 
-	this.midLine = new Path(this.posA, this.posB)
+	this.midLine = new Path(this.posA, this.posB);
 	this.midLine.strokeWidth = 2;
 	this.midLine.strokeCap = 'round';
 	this.midLine.strokeColor = new Color(0.3,0.3,0.3,0.3);
@@ -324,7 +319,6 @@ var Line = function(posA, posB, app) {
 	this.outerLine.strokeColor = new Color(0.2,0.2,0.2,0.2);
 	this.outerLine.strokeCap = 'round';
 	this.outerLine.strokeWidth = 8;
-	// this.outerLine.opacity = 0.3;
 
 	this.soundLine = new Path(this.posA, this.posB);
 	this.soundLine.strokeWidth = 1.0;
@@ -343,17 +337,17 @@ var Line = function(posA, posB, app) {
 	this.soundLine.onDoubleClick = this.deleteLine();
 
 	this.moving = true;
-}
+};
 
 Line.prototype.getSoundOut = function() {
 	return this.gain;
-}
+};
 
 Line.prototype.rest = function(){
 	this.moving = false;
 	this.outerLine.strokeColor = new Color(0, 0, 0, 0.2);
 	this.outerLine.strokeWidth -= 1;
-}
+};
 
 Line.prototype.run = function(){
 	if (this.soundLine.strokeColor.alpha > 0.0) {
@@ -366,7 +360,7 @@ Line.prototype.run = function(){
 			i++;
 		}
 	}
-}
+};
 
 Line.prototype.updateLine = function(posB, snapToScale) {
 	if (snapToScale) {
@@ -385,8 +379,6 @@ Line.prototype.updateLine = function(posB, snapToScale) {
 		this.posB = posB;
 	}
 
-
-
 	this.innerLine.removeSegment(1);
 	this.innerLine.add(this.posB);
 
@@ -403,10 +395,10 @@ Line.prototype.updateLine = function(posB, snapToScale) {
 	this.pitch = 160000 /this.innerLine.length;
 	var text = "frequency: " + parseFloat(this.pitch).toFixed(2).toString();
 	if (this.note) {
-		text += " (" + this.note + ")"
+		text += " (" + this.note + ")";
 	}
 	this.app.freqText.content = text;
-}
+};
 
 Line.prototype.sound = function(ball) {
 	var osc = this.audioContext.createOscillator();
@@ -422,15 +414,16 @@ Line.prototype.sound = function(ball) {
 	this.oscList.push([osc, end]);
 	this.soundLine.strokeColor.setAlpha(Math.min(1.0, this.soundLine.strokeColor.alpha + (0.6 * volume)));
 	var intersections = this.innerLine.getIntersections(ball.outer);
+	var splashpos;
 	if (intersections.length < 2) {
-		var splashpos = intersections[0].point;
+		splashpos = intersections[0].point;
 	} else {
-		var splashpos = (intersections[0].point + intersections[1].point) / 2;
+		splashpos = (intersections[0].point + intersections[1].point) / 2;
 	}
 	if (this.app.colorSplash) {
 		this.splashes.push(new Splash(splashpos, this.pitch, volume, app));
 	}
-}
+};
 
 Line.prototype.purge = function(now){
 	for (var i = 0; i < this.oscList.length;){
@@ -444,20 +437,20 @@ Line.prototype.purge = function(now){
 			i++;
 		}
 	}
-}
+};
 
 Line.prototype.remove = function(){
 	this.line.remove();
 	this.line = false;
 	this.innerLine = false;
-}
+};
 
 Line.prototype.deleteLine = function(){
-		var _this = this;
-		return function(event) {
-			_this.remove();
-	}
-}
+	var _this = this;
+	return function(event) {
+		_this.remove();
+	};
+};
 
 Line.prototype.focusFunc = function() {
 	var _this = this;
@@ -468,8 +461,8 @@ Line.prototype.focusFunc = function() {
 			text += " (" + _this.note + ")";
 		}
 		_this.app.freqText.content = text;
-	}
-}
+	};
+};
 
 Line.prototype.blurFunc = function() {
 	var _this = this;
@@ -478,8 +471,8 @@ Line.prototype.blurFunc = function() {
 			_this.outerLine.strokeColor = new Color(0, 0, 0, 0.2);
 			_this.app.freqText.content = " ";
 		}
-	}
-}
+	};
+};
 
 Line.prototype.createEnv = function(a,d,s,r,volume) {
 	var gain = this.audioContext.createGain();
@@ -493,7 +486,7 @@ Line.prototype.createEnv = function(a,d,s,r,volume) {
 	gain.gain.linearRampToValueAtTime(s * volume, d);
 	gain.gain.linearRampToValueAtTime(0.0, r);
 	return [gain, r];
-}
+};
 
 
 var Splash = function(pos, freq, volume, app) {
@@ -512,7 +505,7 @@ var Splash = function(pos, freq, volume, app) {
 	this.circle.insertBelow(this.app.bgrnd);
 	this.length = 3 + 10  * volume	;
 	this.time = 0;
-}
+};
 
 Splash.prototype.run = function(){
 	if (this.time < this.length){
@@ -524,7 +517,7 @@ Splash.prototype.run = function(){
 		this.circle.remove();
 		return false;
 	}
-}
+};
 
 var app = new App('myCanvas');
 
