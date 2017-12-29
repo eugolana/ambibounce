@@ -1,4 +1,4 @@
-var App = function(canvasId, lines, balls) {
+var App = function(canvasId) {
 	this.canvas = document.getElementById(canvasId);
 	this.width = this.canvas.width;
 	this.height = this.canvas.height;
@@ -16,11 +16,14 @@ var App = function(canvasId, lines, balls) {
 	this.balls = [];
 	this.lines = [];
 	this.setupUI();
-	if (lines) {
-		this.initLines(lines);
-	}
-	if (balls) {
-		this.initBalls(balls);
+	this.parseQS();
+};
+
+App.prototype.gravityShift = function(amount) {
+	if (this.gravity == 0) {
+		this.tempGravity *= amount;
+	} else {
+		this.gravity *= amount;
 	}
 };
 
@@ -38,7 +41,7 @@ App.prototype.initLines = function(lines){
 App.prototype.initBalls = function(balls){
 	for (var i = 0; i < balls.length; i++) {
 		this.balls.push(new Ball(new Point(balls[i][0], balls[i][1]), 10, 10, this));
-	};
+	}
 };
 
 App.prototype.setupUI = function(){
@@ -53,7 +56,7 @@ App.prototype.setupUI = function(){
 	this.initScaleChooser();
 	this.snapToggle = this.constructButton(new Point(25,30), new Size(125, 15), 'Snap to scale - off', 'white');
 	this.snapToggle.onClick = this.toggleSnap();
-	this.freqText = new PointText(new Point(this.width - 140, 100));
+	this.freqText = new PointText(new Point(25, this.height - 40));
 	this.freqText.content = " ";
 	this.freqText.fillColor = 'white';
 	this.freqText.opacity = 0.8;
@@ -62,11 +65,22 @@ App.prototype.setupUI = function(){
 	this.gravityToggle = this.constructButton(new Point(this.width - 145,60), new Size(125, 15), 'Gravity - on', 'white');
 	this.gravityToggle.opacity = 0.8;
 	this.gravityToggle.onClick = this.toggleGravity();
+	this.gravityIncrease = this.constructButton(new Point(this.width - 145, 80), new Size(125, 15), 'Increase Gravity', 'white');
+	this.gravityIncrease.onClick = this.editGravity(1.1);
+	this.gravityDecrease = this.constructButton(new Point(this.width - 145, 100), new Size(125, 15), 'Decrease Gravity', 'white');
+	this.gravityDecrease.onClick = this.editGravity(0.9);
 	this.help = this.constructButton(new Point(20, this.height - 30), new Size(20, 15), '?', 'white');
 	this.showingHelp = false;
 	this.help.onMouseEnter = this.textFocus;
 	this.help.onMouseLeave = this.textBlur;
 	this.help.onClick = this.toggleHelp();
+};
+
+App.prototype.editGravity = function(amount) {
+	var _this = this;
+	return function(event) {
+		_this.gravityShift(amount);
+	};
 };
 
 App.prototype.textFocus = function(){
@@ -211,13 +225,11 @@ App.prototype.initScaleChooser = function() {
 App.prototype.selectScaleClick = function(key){
 	_this = this;
 	return function(event){
-		if (this.opacity == 0.5) {
-			for (var i = 0; i < _this.scaleChooser.children.length; i++) {
-				_this.scaleChooser.children[i].opacity = 0.5;
-			}
-			this.opacity = 1.0;
-			_this.selectedScale = _this.scales[key];
+		for (var i = 0; i < _this.scaleChooser.children.length; i++) {
+			_this.scaleChooser.children[i].opacity = 0.5;
 		}
+		this.opacity = 1.0;
+		_this.selectedScale = _this.scales[key];
 	};
 };
 
@@ -238,7 +250,7 @@ App.prototype.run = function(){
 		if (!ball.run()) {
 			this.balls.splice(ii, 1);
 		} else {
-			ii++
+			ii++;
 		}
 	}
 };
@@ -246,7 +258,7 @@ App.prototype.run = function(){
 App.prototype.initialiseScales = function() {
 	var notes = ["B", "C","C#", "D", "D#", "E", "F", "F#", "G", "G#", "A"].reverse();
 	var chromatic_scale = [];
-	for (var i = 0; i < 120; i++) {
+	for (var i = 0; i < 150; i++) {
 		chromatic_scale.push([1454.54545454545/Math.pow(2, (120 - i)/12), notes[i%12]]);
 	}
 
@@ -273,26 +285,36 @@ App.prototype.initialiseScales = function() {
 };
 
 App.prototype.setSaveQS = function(){
-	var qs = "?";
-	// lines
+	var obj = {};
 	if (this.lines.length > 0) {
-		qs += 'lines=';
+		obj.lines = [];
 		for (var i = 0; i < this.lines.length; i++){
 			var line = this.lines[i];
-			qs += "[[" + line.posA.x + "," + line.posA.y + "],[" + line.posB.x + "," + line.posB.y + "]],";
+			obj.lines.push([[line.posA.x, line.posA.y], [line.posB.x, line.posB.y]]);
 		}
-		qs += ';'
 	}
 	if (this.balls.length > 0) {
-		qs += 'balls=';
-		for (var i = 0; i < this.balls.length; i++){
-			var ball = this.balls[i];
-			qs += "[" + ball.pos.x + "," + ball.pos.y + "],";
+		obj.balls = [];
+		for (var ii = 0; ii < this.balls.length; ii++){
+			var ball = this.balls[ii];
+			obj.balls.push([ball.pos.x, ball.pos.y]);
 		}
 	}
-	this.qs = qs;
-	console.log(this.qs)
-}
+	this.qs = [location.protocol, '//', location.host, location.pathname].join('') + "?obj=" +  JSON.stringify(obj);
+};
+
+App.prototype.parseQS = function(){
+	var qs = getQueryVariable('obj');
+	if (qs) {
+		var obj = JSON.parse(getQueryVariable('obj'));
+		if (obj.lines){
+			this.initLines(obj.lines);
+		}
+		if (obj.balls) {
+			this.initBalls(obj.balls);
+		}
+	}
+};
 
 var Ball = function(pos, size, weight, app){
 	this.app = app;
@@ -348,8 +370,7 @@ Ball.prototype.run = function() {
 
 Ball.prototype.delete = function() {
 	this.ball.remove();
-}
-
+};
 
 var Line = function(posA, posB, app) {
 	this.app = app;
@@ -576,12 +597,20 @@ Splash.prototype.run = function(){
 	}
 };
 
-var lines = [[[100,400], [300,900]]];
-
-var balls = [[150,10]];
-
-var app = new App('myCanvas', lines, balls);
+var app = new App('myCanvas');
 
 function onFrame(){
 	app.run();
+}
+
+function getQueryVariable(variable) {
+    var query = window.location.search.substring(1);
+    var vars = query.split('&');
+    for (var i = 0; i < vars.length; i++) {
+        var pair = vars[i].split('=');
+        if (decodeURIComponent(pair[0]) == variable) {
+            return decodeURIComponent(pair[1]);
+        }
+    }
+    console.log('Query variable %s not found', variable);
 }
