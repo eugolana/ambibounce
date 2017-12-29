@@ -1,112 +1,313 @@
-// construct scale etc..
-var notes = ["A#", "B", "C","C#", "D", "D#", "E", "F", "F#", "G", "G#", "A"].reverse()
-
-var chromatic_scale = [];
-for (var i = 0; i < 120; i++) {
-	chromatic_scale.push([1454.54545454545/Math.pow(2, (120 - i)/12), notes[i%12]])
-}
-
-var pentatonic_scale = [];
-pentapattern = [3,2,2,3,2].reverse()
-n = 0;
-while (n < chromatic_scale.length){
-	pentatonic_scale.push(chromatic_scale[n]);
-	n += pentapattern[(pentatonic_scale.length-1) % pentapattern.length];
-}
-
-
-var major_scale = []
-majorPattern = [2,2,1,2,2,2,1].reverse()
-n = 0;
-while (n < chromatic_scale.length){
-	major_scale.push(chromatic_scale[n]);
-	n += majorPattern[(major_scale.length - 1) % majorPattern.length];
+var App = function(canvasId) {
+	this.canvas = document.getElementById(canvasId);
+	this.width = this.canvas.width;
+	this.height = this.canvas.height;
+	this.audioContext = new (window.AudioContext || window.webkitAudioContext);
+	this.masterGain = this.audioContext.createGain();
+	this.masterGain.gain.value = 0.3;
+	this.masterGain.connect(this.audioContext.destination);
+	this.initialiseScales();
+	this.gravity = 0.075;
+	this.tempPoint;
+	this.tempLine;
+	this.snapToScale = false;
+	this.selectedScale = this.scales['chromatic'];
+	this.colorSplash = true;
+	this.balls = [];
+	this.lines = [];
+	this.setupUI();
 }
 
 
-// canvas/audio setup
-var canvas = document.getElementById('myCanvas')
-// canvas.width = window.width;
+App.prototype.setupUI = function(){
+	this.pre_bgrnd = new Path.Rectangle(new Rectangle(new Point(0,0), new Point(this.width, this.height)));
+	this.pre_bgrnd.fillColor = 'black';
+	this.bgrnd = new Path.Rectangle(new Rectangle(new Point(0,0), new Point(this.width, this.height)));
+	this.bgrnd.fillColor = new Color(0.0,0.0,0.0, 0.1);
+	this.bgrnd.onMouseDown = this.initialiseLine();
+	this.bgrnd.onMouseDrag = this.updateLine();
+	this.bgrnd.onMouseUp =  this.settleLine();
+	this.bgrnd.onDoubleClick = this.spawnBall();
+	this.initScaleChooser();
+	this.snapToggle = this.constructButton(new Point(25,30), new Size(125, 15), 'Snap to scale - off', 'white');
+	this.snapToggle.onClick = this.toggleSnap();
+	this.freqText = new PointText(new Point(this.width - 140, 100));
+	this.freqText.content = " ";
+	this.freqText.fillColor = 'white';
+	this.freqText.opacity = 0.8;
+	this.splashToggle = this.constructButton(new Point(this.width - 145,30), new Size(125, 15), 'Note Splash - off', 'white');
+	this.splashToggle.onClick = this.toggleSplash();
+	this.gravityToggle = this.constructButton(new Point(this.width - 145,60), new Size(125, 15), 'Gravity - on', 'white');
+	this.gravityToggle.opacity = 0.8;
+	this.gravityToggle.onClick = this.toggleGravity();
+	this.help = this.constructButton(new Point(20, this.height - 30), new Size(20, 15), '?', 'white');
+	this.showingHelp = false;
+	this.help.onMouseEnter = this.textFocus;
+	this.help.onMouseLeave = this.textBlur;
+	this.help.onClick = this.toggleHelp();
+}
+
+App.prototype.textFocus = function(){
+	this.opacity = 0.8;
+}
+
+App.prototype.textBlur = function(){
+	this.opacity = 0.5;
+}
+
+App.prototype.toggleHelp = function(){
+	var _this = this;
+	return function(){
+		if (!_this.showingHelp) {
+			this.children[1].content = "Double click to spawn a ball. Click and drag to draw a line.";
+			_this.showingHelp = true;
+		} else {
+			_this.showingHelp = false;
+			this.children[1].content = "?";
+		}
+	}
+}
+
+App.prototype.toggleGravity = function() {
+	var _this = this;
+	return function(event) {
+		if (_this.gravity > 0) {
+			_this.tempGravity = _this.gravity;
+			_this.gravity = 0.0;
+			this.children[1].content = 'Gravity - off';
+			this.opacity = 0.3;
+		} else {
+			_this.gravity = _this.tempGravity;
+			this.children[1].content = 'Gravity - on';
+			this.opacity = 0.8;
+		}
+	}
+
+}
+
+App.prototype.toggleSplash = function() {
+		var _this = this;
+		return function() {
+		if (_this.colorSplash){
+			_this.colorSplash = false;
+			this.opacity = 0.5;
+			this.children[1].content = 'Note splash - off';
+		} else {
+			_this.colorSplash = true;
+			this.opacity = 0.8;
+			this.children[1].content = 'Note splash - on';
+		}
+	}
+}
+
+App.prototype.initialiseLine = function(){
+	var _this = this;
+	return function(event) {
+		_this.tempPoint = event.point;
+	}
+}	
+
+App.prototype.updateLine = function() {
+	var _this = this;
+	return function(event){
+		if (!_this.tempLine) {
+			if ((_this.tempPoint - event.point).length >= 10) {
+				_this.tempLine = new Line(_this.tempPoint, event.point, _this);
+				_this.tempLine.getSoundOut().connect(_this.masterGain);
+				_this.lines.push(_this.tempLine);
+			}
+		}
+		else {
+			_this.tempLine.updateLine(event.point, _this.snapToScale);
+		}
+	}
+}
+
+App.prototype.settleLine = function() {
+	var _this = this;
+	return function(event) {
+		if (_this.tempLine) {
+			_this.tempLine.rest();
+		}
+		_this.tempLine = undefined;
+		_this.tempPoint = undefined;
+	}
+}
+
+App.prototype.spawnBall = function(){
+	var _this = this;
+	return function(event) {
+		_this.balls.push(new Ball(event.point, 10, 10, app));
+	}
+}
 
 
-var audioContext = new (window.AudioContext || window.webkitAudioContext);
+App.prototype.toggleSnap = function() {
+	_this = this;
+	return function(){
+		_this.snapToScale = !_this.snapToScale;
+		if (_this.snapToScale) {
+			this.children[1].content = "Snap to scale - on";
+			this.opacity = 0.8;
+			_this.scaleChooser.bringToFront();
+			_this.scaleChooser.opacity = 0.5;
 
-var masterGain = audioContext.createGain();
-masterGain.gain.value = 0.3;
-masterGain.connect(audioContext.destination);
-
-var pre_bgrnd = new Path.Rectangle(new Rectangle(new Point(0,0), new Point(canvas.width, canvas.height)));
-pre_bgrnd.fillColor = 'black'
-
-
-var bgrnd = new Path.Rectangle(new Rectangle(new Point(0,0), new Point(canvas.width, canvas.height)));
-bgrnd.fillColor = new Color(0.0,0.0,0.0, 0.1);
+		} else {
+			this.children[1].content = "Snap to scale - off";
+			this.opacity = 0.5;
+			_this.scaleChooser.sendToBack();
+			_this.scaleChooser.opacity = 0.0;
+		}
+	}
+}
 
 
-// define objects
-var Ball = function(pos, size, weight){
+
+App.prototype.constructButton = function(pos, size, text, color) {
+	var g = new Group();
+	var rect = new Path.Rectangle(new Rectangle(pos, size));
+	var t = new PointText(pos + new Point(5, 10))
+	t.content = text;
+	t.fillColor = color;
+	g.addChildren([rect, t]);
+	g.opacity = 0.5;
+	return g;
+}
+
+App.prototype.initScaleChooser = function() {
+	this.scaleChooser = new Group();
+	var startPos = new Point(25, 50);
+	var buttonShift = new Point(0, 20);
+	var buttonSize = new Size(125, 15);
+	var scaleKeys = Object.keys(this.scales);
+	for (var i = 0; i < scaleKeys.length; i++) {
+		var pos = startPos + (buttonShift * i);
+		var button = this.constructButton(pos, buttonSize, scaleKeys[i], 'white');
+		button.opacity = 0.8;
+		button.onClick = this.selectScaleClick(scaleKeys[i]);
+		this.scaleChooser.addChild(button);
+	}
+	this.scaleChooser.sendToBack();
+}
+
+App.prototype.selectScaleClick = function(key){
+	_this = this;
+	return function(event){
+		if (this.opacity = 0.5) {
+			for (var i = 0; i < _this.scaleChooser.children.length; i++) {
+				_this.scaleChooser.children[i].opacity = 0.5;
+			}
+			this.opacity = 1.0;
+			_this.selectedScale = _this.scales[key];
+		}
+	}
+}
+
+App.prototype.run = function(){
+	var now = this.audioContext.currentTime;
+	for (var i = 0; i < this.lines.length;) {
+		var line = this.lines[i];
+		line.purge(now);
+		if (!line.line && line.oscList.length == 0) {
+			this.lines.splice(i, 1);
+		} else {
+			line.run();
+			i++;
+		}
+	}
+	for (var i = 0; i < this.balls.length; i++) {
+		var ball = this.balls[i];
+		ball.run();
+	}
+}
+
+App.prototype.initialiseScales = function() {
+	var notes = ["B", "C","C#", "D", "D#", "E", "F", "F#", "G", "G#", "A"].reverse();
+	var chromatic_scale = [];
+	for (var i = 0; i < 120; i++) {
+		chromatic_scale.push([1454.54545454545/Math.pow(2, (120 - i)/12), notes[i%12]]);
+	}
+
+	var pentatonic_scale = [];
+	pentapattern = [3,2,2,3,2].reverse();
+	n = 0;
+	while (n < chromatic_scale.length){
+		pentatonic_scale.push(chromatic_scale[n]);
+		n += pentapattern[(pentatonic_scale.length-1) % pentapattern.length];
+	}
+
+	var major_scale = []
+	majorPattern = [2,2,1,2,2,2,1].reverse();
+	n = 0;
+	while (n < chromatic_scale.length){
+		major_scale.push(chromatic_scale[n]);
+		n += majorPattern[(major_scale.length - 1) % majorPattern.length];
+	}
+	this.scales = {
+		'chromatic': chromatic_scale,
+		'major': major_scale,
+		'pentatonic': pentatonic_scale
+	}
+}
+
+
+var Ball = function(pos, size, weight, app){
+	this.app = app;
 	this.pos = pos;
 	this.size = size;
-	this.weight = weight
-
+	this.weight = weight;
 	this.traj = new Point(0,0);
-	this.ball = new Group()
+	this.ball = new Group();
 	this.inner = Path.Circle(this.pos, size/3);
 	this.inner.opacity = 1;
-	this.mid = Path.Circle(this.pos, size * 0.66)
+	this.mid = Path.Circle(this.pos, size * 0.66);
 	this.mid.opacity = 0.2;
 	this.outer = Path.Circle(this.pos, size);
 	this.outer.opacity = 0.2;
 	this.shell = Path.Circle(this.pos, size * 1.33);
 	this.shell.opacity = 0.1;
-
 	this.soundBall = Path.Circle(this.pos, size/3);
 	this.soundBall.opacity = 0.0;
-
 	this.ball.addChildren([this.inner, this.mid, this.outer, this.shell, this.soundBall]);
 	this.ball.fillColor = 'white';
-
 	this.soundBall.fillColor = 'black';
 	this.bounced = 0;
 }
 
-Ball.prototype.run = function(gravity, lines) {
+Ball.prototype.run = function() {
 	if (this.bounced == 0) {
-		for (var i = 0; i < lines.length; i++) {
-			var line = lines[i]
+		for (var i = 0; i < this.app.lines.length; i++) {
+			var line = this.app.lines[i];
 			if (this.outer.intersects(line.innerLine)){
 				a =  this.traj.angle - line.angle
 				b = 180 - a;
 				c = a - b;
 				this.traj = this.traj.rotate(-180 - c, new Point(0,0))
-				this.bounced = 2;
+				this.bounced = 1;
 				line.sound(this);
 				this.soundBall.opacity = Math.min(0.8, this.soundBall.opacity + 0.3);
-			} else {
-				//
 			}
 		}
 	}
 	else {
 		this.bounced -= 1;
 	}
-	this.traj += new Point(0, gravity);
+	this.traj += new Point(0, this.app.gravity);
 	this.pos += this.traj;
 	this.ball.translate(this.traj);
 	this.soundBall.opacity = this.soundBall.opacity * 0.99;
 }
 
 
-var Line = function(posA, posB, soundOut) {
+var Line = function(posA, posB, app) {
+	this.app = app;
+	this.audioContext = app.audioContext;
 	this.posA = posA;
 	this.posB = posB;
-	this.soundOut = soundOut;
 	this.angle = (posB - posA).angle;
-	this.line = new Group()
-
-	this.gain = audioContext.createGain();
+	this.line = new Group();
+	this.gain = this.audioContext.createGain();
 	this.gain.gain.value = 0.8;
-	this.gain.connect(this.soundOut)
 
 	this.innerLine = new Path(this.posA, this.posB);
 	this.innerLine.strokeWidth = 1.7;
@@ -130,7 +331,7 @@ var Line = function(posA, posB, soundOut) {
 	this.soundLine.strokeCap = 'round';
 	this.soundLine.strokeColor = new Color(1.0,1.0,1.0, 0.0);
 
-	this.line.addChildren([this.innerLine, this.midLine, this.outerLine, this.soundLine])
+	this.line.addChildren([this.innerLine, this.midLine, this.outerLine, this.soundLine]);
 	this.pitch = 160000 / this.outerLine.length;
 	
 	this.oscList = [];
@@ -144,6 +345,10 @@ var Line = function(posA, posB, soundOut) {
 	this.moving = true;
 }
 
+Line.prototype.getSoundOut = function() {
+	return this.gain;
+}
+
 Line.prototype.rest = function(){
 	this.moving = false;
 	this.outerLine.strokeColor = new Color(0, 0, 0, 0.2);
@@ -152,7 +357,7 @@ Line.prototype.rest = function(){
 
 Line.prototype.run = function(){
 	if (this.soundLine.strokeColor.alpha > 0.0) {
-		this.soundLine.strokeColor.setAlpha(this.soundLine.strokeColor.alpha  * 0.98)
+		this.soundLine.strokeColor.setAlpha(this.soundLine.strokeColor.alpha  * 0.98);
 	}
 	for (var i = 0; i < this.splashes.length; i++) {
 		if (!this.splashes[i].run()){
@@ -163,18 +368,15 @@ Line.prototype.run = function(){
 	}
 }
 
-Line.prototype.updateLine = function(posB) {
-	
+Line.prototype.updateLine = function(posB, snapToScale) {
 	if (snapToScale) {
 		var tempLine = (posB - this.posA);
 		length = tempLine.length;
 		var i = 0;
 		while (true) {
-			// console.log('checking against')
-			// console.log(chromatic_scale[i])
-			if (length < selectedScale[i][0]) {
-				this.posB = this.posA + tempLine.normalize(selectedScale[i-1][0]);
-				this.note = selectedScale[i-1][1]
+			if (length < this.app.selectedScale[i][0]) {
+				this.posB = this.posA + tempLine.normalize(this.app.selectedScale[i-1][0]);
+				this.note = this.app.selectedScale[i-1][1];
 				break;
 			}
 			i++;
@@ -186,35 +388,34 @@ Line.prototype.updateLine = function(posB) {
 
 
 	this.innerLine.removeSegment(1);
-	this.innerLine.add(this.posB)
+	this.innerLine.add(this.posB);
 
 	this.outerLine.removeSegment(1);
-	this.outerLine.add(this.posB)
+	this.outerLine.add(this.posB);
 
 	this.midLine.removeSegment(1);
-	this.midLine.add(this.posB)
+	this.midLine.add(this.posB);
 
 	this.soundLine.removeSegment(1);
-	this.soundLine.add(this.posB)
+	this.soundLine.add(this.posB);
 
 	this.angle = (this.posB - this.posA).angle;
-
 	this.pitch = 160000 /this.innerLine.length;
-	var text = "frequency: " + parseFloat(this.pitch).toFixed(2).toString()
+	var text = "frequency: " + parseFloat(this.pitch).toFixed(2).toString();
 	if (this.note) {
 		text += " (" + this.note + ")"
 	}
-	freqText.content = text;
+	this.app.freqText.content = text;
 }
 
 Line.prototype.sound = function(ball) {
-	osc = audioContext.createOscillator();
+	var osc = this.audioContext.createOscillator();
 	osc.frequency.value = this.pitch;
 	var volume = Math.min(ball.traj.length / 10, 1);
-	ge = createEnv(0.05, 0.6, 0.5, 1.0, volume, audioContext);
-	gain = ge[0]
-	end = ge[1]
-	gain.connect(this.gain)
+	var ge = this.createEnv(0.05, 0.6, 0.5, 1.0, volume);
+	var gain = ge[0];
+	var end = ge[1];
+	gain.connect(this.gain);
 	osc.connect(gain);
 	osc.start();
 	this.end = end;
@@ -225,24 +426,22 @@ Line.prototype.sound = function(ball) {
 		var splashpos = intersections[0].point;
 	} else {
 		var splashpos = (intersections[0].point + intersections[1].point) / 2;
-		
 	}
-	if (colorSplash) {
-		this.splashes.push(new Splash(splashpos, this.pitch, volume))
+	if (this.app.colorSplash) {
+		this.splashes.push(new Splash(splashpos, this.pitch, volume, app));
 	}
 }
 
 Line.prototype.purge = function(now){
 	for (var i = 0; i < this.oscList.length;){
-
 		oe = this.oscList[i];
-		osc = oe[0]
-		end = oe[1]
+		osc = oe[0];
+		end = oe[1];
 		if (end <= now) {
-			osc.stop()
-			this.oscList.splice(i, 1)
+			osc.stop();
+			this.oscList.splice(i, 1);
 		} else {
-			i++
+			i++;
 		}
 	}
 }
@@ -254,137 +453,38 @@ Line.prototype.remove = function(){
 }
 
 Line.prototype.deleteLine = function(){
-		var line = this;
+		var _this = this;
 		return function(event) {
-			line.remove();
+			_this.remove();
 	}
 }
 
 Line.prototype.focusFunc = function() {
-	var line = this;
+	var _this = this;
 	return function(event) {
-		line.outerLine.strokeColor = new Color(0.2, 0.2, 0.2, 0.3);
-		var text = "frequency: " + parseFloat(line.pitch).toFixed(2).toString() 
-		if (line.note) {
-			text += " (" + line.note + ")"
+		_this.outerLine.strokeColor = new Color(0.2, 0.2, 0.2, 0.3);
+		var text = "frequency: " + parseFloat(_this.pitch).toFixed(2).toString() ;
+		if (_this.note) {
+			text += " (" + _this.note + ")";
 		}
-		freqText.content = text;
+		_this.app.freqText.content = text;
 	}
 }
 
 Line.prototype.blurFunc = function() {
-	var line = this;
+	var _this = this;
 	return function(event) {
-		if (!line.moving) {
-			line.outerLine.strokeColor = new Color(0, 0, 0, 0.2);
-			freqText.content = " ";
+		if (!_this.moving) {
+			_this.outerLine.strokeColor = new Color(0, 0, 0, 0.2);
+			_this.app.freqText.content = " ";
 		}
 	}
 }
 
-var Splash = function(pos, freq, volume) {
-	this.pos = pos;
-	this.freq = freq;
-	this.volume = volume;
-	this.circle = new Path.Circle(pos, 2.5);
-	this.color = new Color({
-		'hue': Math.log2(this.freq) % 1 * 360 ,
-		'saturation':  volume,
-		'brightness': volume
-	});
-	this.circle.fillColor = this.color;
-	this.circle.opacity = volume;
-	this.circle.insertBelow(bgrnd)
-	this.length = 3 + 10  * volume	;
-	this.time = 0;
-}
-
-Splash.prototype.run = function(){
-	if (this.time < this.length){
-		this.circle.scale(1.5 - ( 0.35 * this.time/this.length)  , this.pos);
-
-		this.circle.opacity *= 0.85;
-		this.time ++;
-		return true;
-	} else {
-		this.circle.remove();
-		return false;
-	}
-}
-
-
-
-// MAIN (should be mvoed into 'app' object)
-
-var gravity = 0.075;
-
-
-var tempPoint;
-var tempLine;
-
-var snapToScale = false;
-var selectedScale = chromatic_scale;
-
-var colorSplash = false;
-
-
-
-balls = [];
-lines = [];
-
-
-function onFrame(){
-	var now = audioContext.currentTime;
-	for (var i = 0; i < lines.length;) {
-		lines[i].purge(now);
-		if (!lines[i].line && lines[i].oscList.length == 0) {
-			lines.splice(i, 1);
-		} else {
-			lines[i].run();
-			i++;
-		}
-	}
-	for (var i = 0; i < balls.length; i++) {
-		balls[i].run(gravity, lines);
-	}
-}
-
-
-bgrnd.onMouseDown = function(event) {
-	tempPoint = event.point;
-}
-
-bgrnd.onMouseDrag = function(event) {
-	if (!tempLine) {
-		if ((tempPoint - event.point).length >= 10) {
-			if (snapToScale) {
-				// Math.pow(2, n/12) ;
-			}
-			tempLine = new Line(tempPoint, event.point, masterGain);
-			lines.push(tempLine)
-		}
-	}
-	else {
-		tempLine.updateLine(event.point)
-	}
-}
-
-bgrnd.onMouseUp = function(event) {
-	if (tempLine) {
-		tempLine.rest();
-	}
-	tempLine = undefined;
-	tempPoint = undefined
-}
-
-bgrnd.onDoubleClick = function(event) {
-	balls.push(new Ball(event.point, 10, 10))
-}
-
-function createEnv(a,d,s,r,volume, context) {
-	var gain = context.createGain();
+Line.prototype.createEnv = function(a,d,s,r,volume) {
+	var gain = this.audioContext.createGain();
 	gain.gain.value = 0.0;
-	var now = context.currentTime;
+	var now = this.audioContext.currentTime;
 	gain.gain.setValueAtTime(gain.gain.value, now);
 	a = now + a;
 	d = a + d;
@@ -396,147 +496,38 @@ function createEnv(a,d,s,r,volume, context) {
 }
 
 
-
-var getButton = function(pos, size, text, color) {
-	var g = new Group()
-	var rect = new Path.Rectangle(new Rectangle(pos, size));
-	var t = new PointText(pos + new Point(5, 10))
-	t.content = text
-	t.fillColor = color
-	// console.log
-	g.addChildren([rect, t])
-	g.opacity = 0.5;
-	return g
+var Splash = function(pos, freq, volume, app) {
+	this.app = app;
+	this.pos = pos;
+	this.freq = freq;
+	this.volume = volume;
+	this.circle = new Path.Circle(pos, 2.5);
+	this.color = new Color({
+		'hue': Math.log2(this.freq) % 1 * 360 ,
+		'saturation':  volume,
+		'brightness': volume
+	});
+	this.circle.fillColor = this.color;
+	this.circle.opacity = volume;
+	this.circle.insertBelow(this.app.bgrnd);
+	this.length = 3 + 10  * volume	;
+	this.time = 0;
 }
 
-var snapToggle = getButton(new Point(25,30), new Size(125, 15), 'Snap to scale - off', 'white');
-
-var scaleChooser = new Group()
-
-var chromButton = getButton(new Point(25, 50), new Size(125, 15), 'Chromatic', 'white')
-chromButton.opacity = 0.8;
-
-var majorButton = getButton(new Point(25, 70), new Size(125, 15), 'Major', 'white')
-var pentatonicButton = getButton(new Point(25, 90), new Size(125, 15), 'Pentatonic', 'white')
-
-
-
-scaleChooser.addChildren([chromButton, majorButton, pentatonicButton])
-
-scaleChooser.sendToBack();
-
-
-snapToggle.onClick = function(){
-	snapToScale = !snapToScale
-	if (snapToScale) {
-		this.children[1].content = "Snap to scale - on"
-		this.opacity = 0.8;
-		scaleChooser.bringToFront();
-		scaleChooser.opacity = 0.5;
-
+Splash.prototype.run = function(){
+	if (this.time < this.length){
+		this.circle.scale(1.5 - ( 0.35 * this.time/this.length) , this.pos);
+		this.circle.opacity *= 0.85;
+		this.time ++;
+		return true;
 	} else {
-		this.children[1].content = "Snap to scale - off"
-		this.opacity = 0.5;
-		scaleChooser.sendToBack();
-		scaleChooser.opacity = 0.0;
+		this.circle.remove();
+		return false;
 	}
 }
 
-chromButton.onClick = function() {
-	if (this.opacity = 0.5) {
-		for (var i = 0; i < scaleChooser.children.length; i++) {
-			scaleChooser.children[i].opacity = 0.5;
-		}
-		this.opacity = 1.0;
-		selectedScale = chromatic_scale;
-	} 
-}
+var app = new App('myCanvas');
 
-majorButton.onClick = function() {
-	if (this.opacity = 0.5) {
-		for (var i = 0; i < scaleChooser.children.length; i++) {
-			scaleChooser.children[i].opacity = 0.5;
-		}
-		this.opacity = 1.0;
-		selectedScale = major_scale;
-	} 
-}
-
-pentatonicButton.onClick = function() {
-	if (this.opacity = 0.5) {
-		for (var i = 0; i < scaleChooser.children.length; i++) {
-			scaleChooser.children[i].opacity = 0.5;
-		}
-		this.opacity = 1.0;
-		selectedScale = pentatonic_scale;
-	} 
-}
-
-
-// var helloText =  new PointText(new Point(20, canvas.height - 5))
-
-
-// helloText.content = "Double click to spawn a ball. Click and drag to draw a line."
-
-// helloText.fillColor = 'white';
-
-var freqText = new PointText(new Point(canvas.width - 140, 100))
-
-freqText.content = " ";
-freqText.fillColor = 'white';
-freqText.opacity = 0.8;
-
-var splashToggle = getButton(new Point(canvas.width - 145,30), new Size(125, 15), 'Note Splash - off', 'white');
-
-
-splashToggle.onClick = function() {
-	if (colorSplash){
-		colorSplash = false;
-		this.opacity = 0.5;
-		this.children[1].content = 'Note splash - off'
-	} else {
-		colorSplash = true;
-		this.opacity = 0.8;
-		this.children[1].content = 'Note splash - on'
-	}
-}
-
-var gravityToggle = getButton(new Point(canvas.width - 145,60), new Size(125, 15), 'Gravity - on', 'white');
-
-gravityToggle.opacity = 0.8;
-
-gravityToggle.onClick = function() {
-	if (gravity > 0) {
-		tempGravity = gravity;
-		gravity = 0.0;
-		this.children[1].content = 'Gravity - off';
-		this.opacity = 0.3;
-	} else {
-		gravity = tempGravity;
-		this.children[1].content = 'Gravity - on';
-		this.opacity = 0.8;
-	}
-}
-
-
-var help = getButton(new Point(20, canvas.height - 30), new Size(20, 15), '?', 'white');
-
-help.onMouseEnter = function(){
-	this.opacity = 0.8;
-}
-
-help.showing = false;
-
-help.onMouseLeave = function(){
-	this.opacity = 0.5;
-}
-
-help.onClick = function(){
-	if (!this.showing) {
-		this.children[1].content = "Double click to spawn a ball. Click and drag to draw a line."
-		this.showing = true;
-	} else {
-		this.showing = false;
-		this.children[1].content = "?"
-	}
+function onFrame(){
+	app.run();
 }
