@@ -1,4 +1,4 @@
-var App = function(canvasId) {
+var App = function(canvasId, lines, balls) {
 	this.canvas = document.getElementById(canvasId);
 	this.width = this.canvas.width;
 	this.height = this.canvas.height;
@@ -16,8 +16,30 @@ var App = function(canvasId) {
 	this.balls = [];
 	this.lines = [];
 	this.setupUI();
+	if (lines) {
+		this.initLines(lines);
+	}
+	if (balls) {
+		this.initBalls(balls);
+	}
 };
 
+App.prototype.initLines = function(lines){
+	for (var i = 0; i < lines.length; i++) {
+		var p1 = new Point(lines[i][0][0], lines[i][0][1]);
+		var p2 = new Point(lines[i][1][0], lines[i][1][1]);
+		var line = new Line(p1, p2, this);
+		line.getSoundOut().connect(this.masterGain);
+		line.rest();
+		this.lines.push(line);
+	}
+};
+
+App.prototype.initBalls = function(balls){
+	for (var i = 0; i < balls.length; i++) {
+		this.balls.push(new Ball(new Point(balls[i][0], balls[i][1]), 10, 10, this));
+	};
+};
 
 App.prototype.setupUI = function(){
 	this.pre_bgrnd = new Path.Rectangle(new Rectangle(new Point(0,0), new Point(this.width, this.height)));
@@ -127,6 +149,7 @@ App.prototype.settleLine = function() {
 	return function(event) {
 		if (_this.tempLine) {
 			_this.tempLine.rest();
+			_this.setSaveQS();
 		}
 		_this.tempLine = undefined;
 		_this.tempPoint = undefined;
@@ -136,7 +159,7 @@ App.prototype.settleLine = function() {
 App.prototype.spawnBall = function(){
 	var _this = this;
 	return function(event) {
-		_this.balls.push(new Ball(event.point, 10, 10, app));
+		_this.balls.push(new Ball(event.point, 10, 10, _this));
 	};
 };
 
@@ -210,9 +233,13 @@ App.prototype.run = function(){
 			i++;
 		}
 	}
-	for (var ii = 0; ii < this.balls.length; ii++) {
+	for (var ii = 0; ii < this.balls.length;) {
 		var ball = this.balls[ii];
-		ball.run();
+		if (!ball.run()) {
+			this.balls.splice(ii, 1);
+		} else {
+			ii++
+		}
 	}
 };
 
@@ -245,6 +272,27 @@ App.prototype.initialiseScales = function() {
 	};
 };
 
+App.prototype.setSaveQS = function(){
+	var qs = "?";
+	// lines
+	if (this.lines.length > 0) {
+		qs += 'lines=';
+		for (var i = 0; i < this.lines.length; i++){
+			var line = this.lines[i];
+			qs += "[[" + line.posA.x + "," + line.posA.y + "],[" + line.posB.x + "," + line.posB.y + "]],";
+		}
+		qs += ';'
+	}
+	if (this.balls.length > 0) {
+		qs += 'balls=';
+		for (var i = 0; i < this.balls.length; i++){
+			var ball = this.balls[i];
+			qs += "[" + ball.pos.x + "," + ball.pos.y + "],";
+		}
+	}
+	this.qs = qs;
+	console.log(this.qs)
+}
 
 var Ball = function(pos, size, weight, app){
 	this.app = app;
@@ -270,6 +318,10 @@ var Ball = function(pos, size, weight, app){
 };
 
 Ball.prototype.run = function() {
+	if (this.pos.x < 0 || this.pos.y < 0 || this.pos.x > this.app.with || this.pos.y > this.app.height) {
+		this.delete();
+		return false;
+	}
 	if (this.bounced == 0) {
 		for (var i = 0; i < this.app.lines.length; i++) {
 			var line = this.app.lines[i];
@@ -291,7 +343,12 @@ Ball.prototype.run = function() {
 	this.pos += this.traj;
 	this.ball.translate(this.traj);
 	this.soundBall.opacity = this.soundBall.opacity * 0.99;
+	return true;
 };
+
+Ball.prototype.delete = function() {
+	this.ball.remove();
+}
 
 
 var Line = function(posA, posB, app) {
@@ -519,7 +576,11 @@ Splash.prototype.run = function(){
 	}
 };
 
-var app = new App('myCanvas');
+var lines = [[[100,400], [300,900]]];
+
+var balls = [[150,10]];
+
+var app = new App('myCanvas', lines, balls);
 
 function onFrame(){
 	app.run();
