@@ -323,19 +323,23 @@ var Ball = function(pos, size, weight, app){
 	this.weight = weight;
 	this.traj = new Point(0,0);
 	this.ball = new Group();
-	this.inner = Path.Circle(this.pos, size/3);
-	this.inner.opacity = 1;
-	this.mid = Path.Circle(this.pos, size * 0.66);
-	this.mid.opacity = 0.2;
-	this.outer = Path.Circle(this.pos, size);
-	this.outer.opacity = 0.2;
 	this.shell = Path.Circle(this.pos, size * 1.33);
 	this.shell.opacity = 0.1;
+
+	this.outer = Path.Circle(this.pos, size);
+	this.outer.opacity = 0.2;
+
+	this.mid = Path.Circle(this.pos, size * 0.66);
+	this.mid.opacity = 0.2;
+
+	// this.inner = Path.Circle(this.pos, size/3);
+	// this.inner.opacity = 1;
+
 	this.soundBall = Path.Circle(this.pos, size/3);
 	this.soundBall.opacity = 0.0;
 	this.ball.addChildren([this.inner, this.mid, this.outer, this.shell, this.soundBall]);
 	this.ball.fillColor = 'white';
-	this.soundBall.fillColor = 'black';
+	this.soundBall.fillColor = 'white';
 	this.bounced = 0;
 };
 
@@ -382,28 +386,25 @@ var Line = function(posA, posB, app) {
 	this.gain = this.audioContext.createGain();
 	this.gain.gain.value = 0.8;
 
+	this.color = new Color(1,1,1);
+
 	this.innerLine = new Path(this.posA, this.posB);
 	this.innerLine.strokeWidth = 1.7;
 	this.innerLine.opacity = 0.8;
 	this.innerLine.strokeCap = 'round';
-	this.innerLine.strokeColor = new Color(0.0,0.0,0.0,1.0);
-
-	this.midLine = new Path(this.posA, this.posB);
-	this.midLine.strokeWidth = 2;
-	this.midLine.strokeCap = 'round';
-	this.midLine.strokeColor = new Color(0.3,0.3,0.3,0.3);
+	this.innerLine.strokeColor = new Color(0.1,0.1,0.1,1.0);
 
 	this.outerLine = new Path(this.posA, this.posB);
-	this.outerLine.strokeColor = new Color(0.2,0.2,0.2,0.2);
+	this.outerLine.strokeColor = new Color(0.3,0.3,0.3,0.3);
 	this.outerLine.strokeCap = 'round';
 	this.outerLine.strokeWidth = 8;
 
 	this.soundLine = new Path(this.posA, this.posB);
 	this.soundLine.strokeWidth = 1.0;
 	this.soundLine.strokeCap = 'round';
-	this.soundLine.strokeColor = new Color(1.0,1.0,1.0, 0.0);
+	this.soundLine.strokeColor = this.color;
 
-	this.line.addChildren([this.innerLine, this.midLine, this.outerLine, this.soundLine]);
+	this.line.addChildren([this.innerLine, this.outerLine, this.soundLine]);
 	this.pitch = 160000 / this.outerLine.length;
 	
 	this.oscList = [];
@@ -424,7 +425,6 @@ Line.prototype.getSoundOut = function() {
 Line.prototype.rest = function(){
 	this.moving = false;
 	this.outerLine.strokeColor = new Color(0, 0, 0, 0.2);
-	this.outerLine.strokeWidth -= 1;
 };
 
 Line.prototype.run = function(){
@@ -463,14 +463,19 @@ Line.prototype.updateLine = function(posB, snapToScale) {
 	this.outerLine.removeSegment(1);
 	this.outerLine.add(this.posB);
 
-	this.midLine.removeSegment(1);
-	this.midLine.add(this.posB);
-
 	this.soundLine.removeSegment(1);
 	this.soundLine.add(this.posB);
 
 	this.angle = (this.posB - this.posA).angle;
 	this.pitch = 160000 /this.innerLine.length;
+
+	this.color = new Color({
+		'hue': Math.log2(this.pitch) % 1 * 360 ,
+		'saturation':  1,
+		'brightness': 0.5
+	});
+
+	this.soundLine.strokeColor = this.color;
 	var text = "frequency: " + parseFloat(this.pitch).toFixed(2).toString();
 	if (this.note) {
 		text += " (" + this.note + ")";
@@ -499,7 +504,7 @@ Line.prototype.sound = function(ball) {
 		splashpos = (intersections[0].point + intersections[1].point) / 2;
 	}
 	if (this.app.colorSplash) {
-		this.splashes.push(new Splash(splashpos, this.pitch, volume, app));
+		this.splashes.push(new Splash(splashpos, volume, this, app));
 	}
 };
 
@@ -533,7 +538,8 @@ Line.prototype.deleteLine = function(){
 Line.prototype.focusFunc = function() {
 	var _this = this;
 	return function(event) {
-		_this.outerLine.strokeColor = new Color(0.2, 0.2, 0.2, 0.3);
+		_this.outerLine.strokeColor = new Color(0.2, 0.2, 0.2, 0.5);
+		_this.soundLine.strokeColor.setAlpha(0.8);
 		var text = "frequency: " + parseFloat(_this.pitch).toFixed(2).toString() ;
 		if (_this.note) {
 			text += " (" + _this.note + ")";
@@ -567,17 +573,14 @@ Line.prototype.createEnv = function(a,d,s,r,volume) {
 };
 
 
-var Splash = function(pos, freq, volume, app) {
+var Splash = function(pos, volume, line, app) {
 	this.app = app;
+	this.line = line;
 	this.pos = pos;
-	this.freq = freq;
+	this.freq = this.line.pitch;
 	this.volume = volume;
 	this.circle = new Path.Circle(pos, 2.5);
-	this.color = new Color({
-		'hue': Math.log2(this.freq) % 1 * 360 ,
-		'saturation':  volume,
-		'brightness': volume
-	});
+	this.color = this.line.color;
 	this.circle.fillColor = this.color;
 	this.circle.opacity = volume;
 	this.circle.insertBelow(this.app.bgrnd);
