@@ -106,7 +106,7 @@ App.prototype.copyLink = function() {
 			_this.linkElement.style.display = 'block';
 			this.opacity = 1.0;
 		} else {
-			_this.linkVisible = true;
+			_this.linkVisible = false;
 			_this.linkElement.style.display = 'none';
 			this.opacity = 0.5;
 		}
