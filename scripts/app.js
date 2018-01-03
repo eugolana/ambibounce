@@ -1,7 +1,7 @@
 var App = function(canvasId) {
 	this.canvas = document.getElementById(canvasId);
-	this.width = this.canvas.width;
-	this.height = this.canvas.height;
+	this.width = this.canvas.width / devicePixelRatio;
+	this.height = this.canvas.height / devicePixelRatio;
 	this.audioContext = (new window.AudioContext() || new window.webkitAudioContext());
 	this.masterGain = this.audioContext.createGain();
 	this.masterGain.gain.value = 0.3;
