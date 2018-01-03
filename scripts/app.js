@@ -54,7 +54,7 @@ App.prototype.initLines = function(lines){
 
 App.prototype.initBalls = function(balls){
 	for (var i = 0; i < balls.length; i++) {
-		this.balls.push(new Ball(new Point(balls[i][0], balls[i][1]), 10, 10, this));
+		this.balls.push(new Ball(new Point(parseFloat(balls[i][0]), parseFloat(balls[i][1])), 10, 10, this));
 	}
 };
 
@@ -106,7 +106,7 @@ App.prototype.copyLink = function() {
 			_this.linkElement.style.display = 'block';
 			this.opacity = 1.0;
 		} else {
-			_this.linkVisible = true;
+			_this.linkVisible = false;
 			_this.linkElement.style.display = 'none';
 			this.opacity = 0.5;
 		}
@@ -367,7 +367,7 @@ App.prototype.setSaveQS = function(){
 		obj.balls = [];
 		for (var ii = 0; ii < this.balls.length; ii++){
 			var ball = this.balls[ii];
-			obj.balls.push([parseFloat(ball.pos.x).toFixed(2), parseFloat(ball.pos.y).toFixed(2)]);
+			obj.balls.push([parseFloat(ball.pos.x.toFixed(2)), parseFloat(ball.pos.y.toFixed(2))]);
 		}
 	}
 	this.qs = [location.protocol, '//', location.host, location.pathname].join('') + "?obj=" +  JSON.stringify(obj);
