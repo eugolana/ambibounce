@@ -7,17 +7,31 @@ var App = function(canvasId) {
 	this.masterGain.gain.value = 0.3;
 	this.masterGain.connect(this.audioContext.destination);
 	this.initialiseScales();
+	this.waveType = 'sine';
 	this.gravity = 0.075;
 	this.tempPoint = undefined;
 	this.tempLine = undefined;
 	this.snapToScale = false;
 	this.selectedScale = this.scales.chromatic;
-	this.colorSplash = false;
+	this.colorSplash = true;
 	this.balls = [];
 	this.lines = [];
 	this.setupUI();
 	this.parseQS();
+	this.initShareLink();
+	this.linkVisible = false;
+	this.setSaveQS();
 };
+
+App.prototype.initShareLink = function() {
+	var div = document.createElement('div');
+	div.id = 'popup';
+	var p = document.createElement('p');
+	p.innerText = _this.qs;
+	div.appendChild(p);
+	document.body.appendChild(div);
+	this.linkElement = div;
+}
 
 App.prototype.gravityShift = function(amount) {
 	if (this.gravity == 0) {
@@ -53,15 +67,15 @@ App.prototype.setupUI = function(){
 	this.bgrnd.onMouseDrag = this.updateLine();
 	this.bgrnd.onMouseUp =  this.settleLine();
 	this.bgrnd.onDoubleClick = this.spawnBall();
-	this.initScaleChooser();
-	this.snapToggle = this.constructButton(new Point(25,30), new Size(125, 15), 'Snap to scale - off', 'white');
+	this.snapToggle = this.constructButton(new Point(25,125), new Size(125, 15), 'Snap to scale - off', 'white');
 	this.snapToggle.onClick = this.toggleSnap();
 	this.freqText = new PointText(new Point(25, this.height - 40));
 	this.freqText.content = " ";
 	this.freqText.fillColor = 'white';
 	this.freqText.opacity = 0.8;
-	this.splashToggle = this.constructButton(new Point(this.width - 145,30), new Size(125, 15), 'Note Splash - off', 'white');
+	this.splashToggle = this.constructButton(new Point(this.width - 145,30), new Size(125, 15), 'Note Splash - on', 'white');
 	this.splashToggle.onClick = this.toggleSplash();
+	this.splashToggle.opacity = 0.8;
 	this.gravityToggle = this.constructButton(new Point(this.width - 145,60), new Size(125, 15), 'Gravity - on', 'white');
 	this.gravityToggle.opacity = 0.8;
 	this.gravityToggle.onClick = this.toggleGravity();
@@ -74,7 +88,30 @@ App.prototype.setupUI = function(){
 	this.help.onMouseEnter = this.textFocus;
 	this.help.onMouseLeave = this.textBlur;
 	this.help.onClick = this.toggleHelp();
+
+	this.copyLinkButton = this.constructButton(new Point(this.width - 145, 120), new Size(125, 15), 'Copy Sharable Link', 'white');
+	this.copyLinkButton.onClick = this.copyLink();
+	this.initScaleChooser();
+	this.initWaveTypeChooser();
 };
+
+App.prototype.copyLink = function() {
+	var _this = this;
+	return function() {
+
+		if (! _this.linkVisible) {
+			_this.setSaveQS();
+			_this.linkVisible = true;
+			_this.linkElement.children[0].innerText = _this.qs;
+			_this.linkElement.style.display = 'block';
+			this.opacity = 1.0;
+		} else {
+			_this.linkVisible = true;
+			_this.linkElement.style.display = 'none';
+			this.opacity = 0.5;
+		}
+	}
+}
 
 App.prototype.editGravity = function(amount) {
 	var _this = this;
@@ -208,8 +245,8 @@ App.prototype.constructButton = function(pos, size, text, color) {
 
 App.prototype.initScaleChooser = function() {
 	this.scaleChooser = new Group();
-	var startPos = new Point(25, 50);
-	var buttonShift = new Point(0, 20);
+	var startPos = new Point(25, 145);
+	var buttonShift = new Point(0, 15);
 	var buttonSize = new Size(125, 15);
 	var scaleKeys = Object.keys(this.scales);
 	for (var i = 0; i < scaleKeys.length; i++) {
@@ -232,6 +269,39 @@ App.prototype.selectScaleClick = function(key){
 		_this.selectedScale = _this.scales[key];
 	};
 };
+
+App.prototype.initWaveTypeChooser = function() {
+	this.waveTypeChooser = new Group();
+	var startPos = new Point(25, 45);
+	var buttonShift = new Point(0, 15);
+	var buttonSize = new Size(80, 15);
+	var label =  new PointText(startPos + new Point(5, -10));
+	label.content = "Wavetype: ";
+	label.fillColor = 'white';
+	label.opacity = 0.8;
+	this.waveTypeChooser.addChild(label);
+	var waveTypes = ['sine', 'square', 'sawtooth', 'triangle']
+	for (var i = 0; i < waveTypes.length; i++) {
+		var pos = startPos + ( buttonShift * i)
+		var button = this.constructButton(pos, buttonSize, waveTypes[i], 'white');
+		button.opacity = 0.5;
+		button.onClick = this.selectWaveTypeClick(waveTypes[i]);
+		this.waveTypeChooser.addChild(button);
+	}
+	this.waveTypeChooser.children[1].opacity = 1.0
+};
+
+App.prototype.selectWaveTypeClick = function(type){
+	_this = this;
+	return function(event){
+		for (var i = 1; i < _this.waveTypeChooser.children.length; i++) {
+			_this.waveTypeChooser.children[i].opacity = 0.5;
+		}
+		this.opacity = 1.0;
+		_this.waveType = type;
+	};
+};
+
 
 App.prototype.run = function(){
 	var now = this.audioContext.currentTime;
@@ -297,7 +367,7 @@ App.prototype.setSaveQS = function(){
 		obj.balls = [];
 		for (var ii = 0; ii < this.balls.length; ii++){
 			var ball = this.balls[ii];
-			obj.balls.push([ball.pos.x, ball.pos.y]);
+			obj.balls.push([parseFloat(ball.pos.x).toFixed(2), parseFloat(ball.pos.y).toFixed(2)]);
 		}
 	}
 	this.qs = [location.protocol, '//', location.host, location.pathname].join('') + "?obj=" +  JSON.stringify(obj);
@@ -416,6 +486,7 @@ var Line = function(posA, posB, app) {
 	this.soundLine.onDoubleClick = this.deleteLine();
 
 	this.moving = true;
+	this.updateInfo();
 };
 
 Line.prototype.getSoundOut = function() {
@@ -466,6 +537,10 @@ Line.prototype.updateLine = function(posB, snapToScale) {
 	this.soundLine.removeSegment(1);
 	this.soundLine.add(this.posB);
 
+	this.updateInfo();
+};
+
+Line.prototype.updateInfo = function() {
 	this.angle = (this.posB - this.posA).angle;
 	this.pitch = 160000 /this.innerLine.length;
 
@@ -481,11 +556,12 @@ Line.prototype.updateLine = function(posB, snapToScale) {
 		text += " (" + this.note + ")";
 	}
 	this.app.freqText.content = text;
-};
+}
 
 Line.prototype.sound = function(ball) {
 	var osc = this.audioContext.createOscillator();
 	osc.frequency.value = this.pitch;
+	osc.type = this.app.waveType;
 	var volume = Math.min(ball.traj.length / 10, 1);
 	var ge = this.createEnv(0.05, 0.6, 0.5, 1.0, volume);
 	var gain = ge[0];
@@ -615,5 +691,4 @@ function getQueryVariable(variable) {
             return decodeURIComponent(pair[1]);
         }
     }
-    console.log('Query variable %s not found', variable);
 }
